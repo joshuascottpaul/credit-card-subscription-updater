@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Credit Card - Subscriptions</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 20px; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h1 { font-size: 24px; color: #333; margin-bottom: 5px; }
+        .progress { font-size: 14px; color: #666; margin-top: 8px; }
+        .progress-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #4caf50; width: 0%; transition: width 0.3s; }
+        .search-box { margin-top: 12px; position: relative; }
+        .search-box input { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .search-box input:focus { outline: none; border-color: #1976d2; }
+        .filter-count { font-size: 12px; color: #666; margin-top: 4px; }
+        .sort-controls { margin-top: 12px; display: flex; gap: 8px; align-items: center; font-size: 14px; }
+        .sort-controls label { color: #666; }
+        .sort-controls select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; cursor: pointer; }
+        .sort-controls select:focus { outline: none; border-color: #1976d2; }
+        .list { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .item { background: white; padding: 20px; margin-bottom: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.3s; }
+        .item.done { opacity: 0.5; }
+        .item.done .merchant { text-decoration: line-through; }
+        .top-row { display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; }
+        .merchant { font-size: 18px; font-weight: 600; color: #1a1a1a; flex: 1; }
+        .checkbox { width: 24px; height: 24px; cursor: pointer; margin-left: 12px; }
+        .details { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; color: #666; }
+        .detail { display: flex; align-items: center; gap: 6px; }
+        .amount { color: #d32f2f; font-weight: 600; }
+        .next { font-weight: 500; }
+        .next.urgent { color: #d32f2f; }
+        .next.soon { color: #f57c00; }
+        .next.ok { color: #2e7d32; }
+        .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+        .buttons a { display: inline-block; padding: 10px 20px; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .btn-primary { background: #1976d2; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-secondary { background: #757575; }
+        .btn-secondary:hover { background: #616161; }
+        .item.done .buttons a { background: #9e9e9e; pointer-events: none; }
+        .toggle-charges { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 14px; padding: 5px 0; display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+        .toggle-charges:hover { text-decoration: underline; }
+        .triangle { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #1976d2; transition: transform 0.2s; }
+        .triangle.open { transform: rotate(180deg); }
+        .charges-list { display: none; margin-top: 12px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 13px; }
+        .charges-list.open { display: block; }
+        .charge-item { padding: 6px 0; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; }
+        .charge-item:last-child { border-bottom: none; }
+        .charge-date { color: #666; }
+        .charge-amount { font-weight: 600; color: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔄 Update Credit Card</h1>
+        <div class="progress"><span id="done-count">0</span> of <span id="total-count">0</span> completed</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search subscriptions..." oninput="filterItems()">
+            <div class="filter-count" id="filter-count"></div>
+        </div>
+        <div class="sort-controls">
+            <label>Sort by:</label>
+            <select id="sort-select" onchange="sortItems()">
+                <option value="status">Status (incomplete first)</option>
+                <option value="amount-high">Amount (high to low)</option>
+                <option value="amount-low">Amount (low to high)</option>
+                <option value="date-soon">Next billing (soonest first)</option>
+                <option value="date-later">Next billing (latest first)</option>
+            </select>
+        </div>
+    </div>
+    <div class="list" id="list">
+        <div class="item" data-id="0" data-amount="151.03" data-next-date="2026-02-12">
+            <div class="top-row">
+                <div class="merchant">GROCERY STORE VANCOUVER</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(0)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$151.03</span> avg</div>
+                <div class="detail">24 charges</div>
+                <div class="detail">Every 15 days</div>
+                <div class="detail next urgent">Next: Feb 12, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=GROCERY+STORE+VANCOUVER+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=GROCERY+STORE+VANCOUVER+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(0)">
+                <span class="triangle" id="triangle-0"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-0">
+                <div class="charge-item"><span class="charge-date">Dec 28, 2025</span><span class="charge-amount">$162.34</span></div><div class="charge-item"><span class="charge-date">Dec 10, 2025</span><span class="charge-amount">$174.92</span></div><div class="charge-item"><span class="charge-date">Nov 28, 2025</span><span class="charge-amount">$151.23</span></div><div class="charge-item"><span class="charge-date">Nov 10, 2025</span><span class="charge-amount">$168.56</span></div><div class="charge-item"><span class="charge-date">Oct 28, 2025</span><span class="charge-amount">$143.78</span></div><div class="charge-item"><span class="charge-date">Oct 10, 2025</span><span class="charge-amount">$157.92</span></div><div class="charge-item"><span class="charge-date">Sep 28, 2025</span><span class="charge-amount">$136.89</span></div><div class="charge-item"><span class="charge-date">Sep 10, 2025</span><span class="charge-amount">$161.45</span></div><div class="charge-item"><span class="charge-date">Aug 28, 2025</span><span class="charge-amount">$149.67</span></div><div class="charge-item"><span class="charge-date">Aug 10, 2025</span><span class="charge-amount">$154.23</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="1" data-amount="8.36" data-next-date="2026-02-20">
+            <div class="top-row">
+                <div class="merchant">COFFEE SHOP DOWNTOWN</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(1)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$8.36</span> avg</div>
+                <div class="detail">23 charges</div>
+                <div class="detail">Every 15 days</div>
+                <div class="detail next soon">Next: Feb 20, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=COFFEE+SHOP+DOWNTOWN+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=COFFEE+SHOP+DOWNTOWN+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(1)">
+                <span class="triangle" id="triangle-1"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-1">
+                <div class="charge-item"><span class="charge-date">Dec 20, 2025</span><span class="charge-amount">$8.85</span></div><div class="charge-item"><span class="charge-date">Dec 07, 2025</span><span class="charge-amount">$7.95</span></div><div class="charge-item"><span class="charge-date">Nov 20, 2025</span><span class="charge-amount">$9.35</span></div><div class="charge-item"><span class="charge-date">Nov 07, 2025</span><span class="charge-amount">$8.60</span></div><div class="charge-item"><span class="charge-date">Oct 20, 2025</span><span class="charge-amount">$8.20</span></div><div class="charge-item"><span class="charge-date">Oct 07, 2025</span><span class="charge-amount">$9.10</span></div><div class="charge-item"><span class="charge-date">Sep 20, 2025</span><span class="charge-amount">$8.75</span></div><div class="charge-item"><span class="charge-date">Sep 07, 2025</span><span class="charge-amount">$7.90</span></div><div class="charge-item"><span class="charge-date">Aug 20, 2025</span><span class="charge-amount">$9.50</span></div><div class="charge-item"><span class="charge-date">Aug 07, 2025</span><span class="charge-amount">$8.40</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="2" data-amount="70.44" data-next-date="2026-02-22">
+            <div class="top-row">
+                <div class="merchant">GAS STATION RICHMOND</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(2)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$70.44</span> avg</div>
+                <div class="detail">13 charges</div>
+                <div class="detail">Every 27 days</div>
+                <div class="detail next ok">Next: Feb 22, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=GAS+STATION+RICHMOND+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=GAS+STATION+RICHMOND+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(2)">
+                <span class="triangle" id="triangle-2"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-2">
+                <div class="charge-item"><span class="charge-date">Dec 03, 2025</span><span class="charge-amount">$71.89</span></div><div class="charge-item"><span class="charge-date">Nov 03, 2025</span><span class="charge-amount">$69.34</span></div><div class="charge-item"><span class="charge-date">Oct 03, 2025</span><span class="charge-amount">$72.56</span></div><div class="charge-item"><span class="charge-date">Sep 03, 2025</span><span class="charge-amount">$67.23</span></div><div class="charge-item"><span class="charge-date">Aug 03, 2025</span><span class="charge-amount">$70.45</span></div><div class="charge-item"><span class="charge-date">Jul 03, 2025</span><span class="charge-amount">$74.12</span></div><div class="charge-item"><span class="charge-date">Jun 03, 2025</span><span class="charge-amount">$68.91</span></div><div class="charge-item"><span class="charge-date">May 03, 2025</span><span class="charge-amount">$72.34</span></div><div class="charge-item"><span class="charge-date">Apr 12, 2025</span><span class="charge-amount">$69.78</span></div><div class="charge-item"><span class="charge-date">Mar 20, 2025</span><span class="charge-amount">$73.56</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="3" data-amount="16.49" data-next-date="2026-03-06">
+            <div class="top-row">
+                <div class="merchant">NETFLIX.COM 866-579-7172</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(3)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$16.49</span> avg</div>
+                <div class="detail">12 charges</div>
+                <div class="detail">Every 30 days</div>
+                <div class="detail next ok">Next: Mar 06, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=NETFLIX.COM+866-579-7172+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=NETFLIX.COM+866-579-7172+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(3)">
+                <span class="triangle" id="triangle-3"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-3">
+                <div class="charge-item"><span class="charge-date">Dec 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Nov 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Oct 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Sep 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Aug 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Jul 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Jun 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">May 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Apr 05, 2025</span><span class="charge-amount">$16.49</span></div><div class="charge-item"><span class="charge-date">Mar 05, 2025</span><span class="charge-amount">$16.49</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="4" data-amount="17.00" data-next-date="2026-02-06">
+            <div class="top-row">
+                <div class="merchant">SPOTIFY USA 877-778-6087</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(4)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$17.00</span> avg</div>
+                <div class="detail">12 charges</div>
+                <div class="detail">Every 30 days</div>
+                <div class="detail next urgent">Next: Feb 06, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=SPOTIFY+USA+877-778-6087+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=SPOTIFY+USA+877-778-6087+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(4)">
+                <span class="triangle" id="triangle-4"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-4">
+                <div class="charge-item"><span class="charge-date">Dec 08, 2025</span><span class="charge-amount">$16.85</span></div><div class="charge-item"><span class="charge-date">Nov 08, 2025</span><span class="charge-amount">$16.88</span></div><div class="charge-item"><span class="charge-date">Oct 08, 2025</span><span class="charge-amount">$16.91</span></div><div class="charge-item"><span class="charge-date">Sep 08, 2025</span><span class="charge-amount">$16.93</span></div><div class="charge-item"><span class="charge-date">Aug 08, 2025</span><span class="charge-amount">$16.96</span></div><div class="charge-item"><span class="charge-date">Jul 08, 2025</span><span class="charge-amount">$16.99</span></div><div class="charge-item"><span class="charge-date">Jun 08, 2025</span><span class="charge-amount">$17.02</span></div><div class="charge-item"><span class="charge-date">May 08, 2025</span><span class="charge-amount">$17.04</span></div><div class="charge-item"><span class="charge-date">Apr 08, 2025</span><span class="charge-amount">$17.07</span></div><div class="charge-item"><span class="charge-date">Mar 08, 2025</span><span class="charge-amount">$17.10</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="5" data-amount="14.16" data-next-date="2026-02-16">
+            <div class="top-row">
+                <div class="merchant">CLOUD STORAGE INC CLOUDSTORE.COM</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(5)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$14.16</span> avg</div>
+                <div class="detail">12 charges</div>
+                <div class="detail">Every 30 days</div>
+                <div class="detail next soon">Next: Feb 16, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=CLOUD+STORAGE+INC+CLOUDSTORE.COM+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=CLOUD+STORAGE+INC+CLOUDSTORE.COM+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(5)">
+                <span class="triangle" id="triangle-5"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-5">
+                <div class="charge-item"><span class="charge-date">Dec 18, 2025</span><span class="charge-amount">$14.03</span></div><div class="charge-item"><span class="charge-date">Nov 18, 2025</span><span class="charge-amount">$14.06</span></div><div class="charge-item"><span class="charge-date">Oct 18, 2025</span><span class="charge-amount">$14.08</span></div><div class="charge-item"><span class="charge-date">Sep 18, 2025</span><span class="charge-amount">$14.10</span></div><div class="charge-item"><span class="charge-date">Aug 18, 2025</span><span class="charge-amount">$14.12</span></div><div class="charge-item"><span class="charge-date">Jul 18, 2025</span><span class="charge-amount">$14.14</span></div><div class="charge-item"><span class="charge-date">Jun 18, 2025</span><span class="charge-amount">$14.17</span></div><div class="charge-item"><span class="charge-date">May 18, 2025</span><span class="charge-amount">$14.19</span></div><div class="charge-item"><span class="charge-date">Apr 18, 2025</span><span class="charge-amount">$14.21</span></div><div class="charge-item"><span class="charge-date">Mar 18, 2025</span><span class="charge-amount">$14.24</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="6" data-amount="98.59" data-next-date="2026-02-09">
+            <div class="top-row">
+                <div class="merchant">RESTAURANT DOWNTOWN</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(6)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$98.59</span> avg</div>
+                <div class="detail">12 charges</div>
+                <div class="detail">Every 29 days</div>
+                <div class="detail next urgent">Next: Feb 09, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=RESTAURANT+DOWNTOWN+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=RESTAURANT+DOWNTOWN+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(6)">
+                <span class="triangle" id="triangle-6"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-6">
+                <div class="charge-item"><span class="charge-date">Dec 12, 2025</span><span class="charge-amount">$132.45</span></div><div class="charge-item"><span class="charge-date">Nov 12, 2025</span><span class="charge-amount">$95.67</span></div><div class="charge-item"><span class="charge-date">Oct 12, 2025</span><span class="charge-amount">$108.23</span></div><div class="charge-item"><span class="charge-date">Sep 12, 2025</span><span class="charge-amount">$92.34</span></div><div class="charge-item"><span class="charge-date">Aug 12, 2025</span><span class="charge-amount">$119.78</span></div><div class="charge-item"><span class="charge-date">Jul 12, 2025</span><span class="charge-amount">$87.45</span></div><div class="charge-item"><span class="charge-date">Jun 12, 2025</span><span class="charge-amount">$103.67</span></div><div class="charge-item"><span class="charge-date">May 12, 2025</span><span class="charge-amount">$78.90</span></div><div class="charge-item"><span class="charge-date">Apr 15, 2025</span><span class="charge-amount">$95.23</span></div><div class="charge-item"><span class="charge-date">Mar 12, 2025</span><span class="charge-amount">$112.45</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="7" data-amount="9.95" data-next-date="2026-02-23">
+            <div class="top-row">
+                <div class="merchant">GITHUB.COM 855-448-4820</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(7)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$9.95</span> avg</div>
+                <div class="detail">12 charges</div>
+                <div class="detail">Every 30 days</div>
+                <div class="detail next ok">Next: Feb 23, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=GITHUB.COM+855-448-4820+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=GITHUB.COM+855-448-4820+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(7)">
+                <span class="triangle" id="triangle-7"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-7">
+                <div class="charge-item"><span class="charge-date">Dec 25, 2025</span><span class="charge-amount">$9.86</span></div><div class="charge-item"><span class="charge-date">Nov 25, 2025</span><span class="charge-amount">$9.88</span></div><div class="charge-item"><span class="charge-date">Oct 25, 2025</span><span class="charge-amount">$9.89</span></div><div class="charge-item"><span class="charge-date">Sep 25, 2025</span><span class="charge-amount">$9.91</span></div><div class="charge-item"><span class="charge-date">Aug 25, 2025</span><span class="charge-amount">$9.93</span></div><div class="charge-item"><span class="charge-date">Jul 25, 2025</span><span class="charge-amount">$9.94</span></div><div class="charge-item"><span class="charge-date">Jun 25, 2025</span><span class="charge-amount">$9.96</span></div><div class="charge-item"><span class="charge-date">May 25, 2025</span><span class="charge-amount">$9.97</span></div><div class="charge-item"><span class="charge-date">Apr 25, 2025</span><span class="charge-amount">$9.99</span></div><div class="charge-item"><span class="charge-date">Mar 25, 2025</span><span class="charge-amount">$10.00</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="8" data-amount="126.48" data-next-date="2026-02-28">
+            <div class="top-row">
+                <div class="merchant">AMAZON.CA WWW.AMAZON.CA</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(8)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$126.48</span> avg</div>
+                <div class="detail">11 charges</div>
+                <div class="detail">Every 34 days</div>
+                <div class="detail next ok">Next: Feb 28, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=AMAZON.CA+WWW.AMAZON.CA+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=AMAZON.CA+WWW.AMAZON.CA+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(8)">
+                <span class="triangle" id="triangle-8"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-8">
+                <div class="charge-item"><span class="charge-date">Dec 22, 2025</span><span class="charge-amount">$189.67</span></div><div class="charge-item"><span class="charge-date">Nov 22, 2025</span><span class="charge-amount">$213.45</span></div><div class="charge-item"><span class="charge-date">Oct 22, 2025</span><span class="charge-amount">$86.45</span></div><div class="charge-item"><span class="charge-date">Sep 22, 2025</span><span class="charge-amount">$145.28</span></div><div class="charge-item"><span class="charge-date">Aug 22, 2025</span><span class="charge-amount">$73.92</span></div><div class="charge-item"><span class="charge-date">Jul 22, 2025</span><span class="charge-amount">$198.34</span></div><div class="charge-item"><span class="charge-date">Jun 22, 2025</span><span class="charge-amount">$124.56</span></div><div class="charge-item"><span class="charge-date">May 20, 2025</span><span class="charge-amount">$67.45</span></div><div class="charge-item"><span class="charge-date">Apr 03, 2025</span><span class="charge-amount">$156.73</span></div><div class="charge-item"><span class="charge-date">Feb 22, 2025</span><span class="charge-amount">$92.18</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="9" data-amount="89.99" data-next-date="2026-03-01">
+            <div class="top-row">
+                <div class="merchant">INTERNET SERVICE PROVIDER</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(9)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$89.99</span> avg</div>
+                <div class="detail">11 charges</div>
+                <div class="detail">Every 30 days</div>
+                <div class="detail next ok">Next: Mar 01, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=INTERNET+SERVICE+PROVIDER+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=INTERNET+SERVICE+PROVIDER+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(9)">
+                <span class="triangle" id="triangle-9"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-9">
+                <div class="charge-item"><span class="charge-date">Dec 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Nov 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Oct 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Sep 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Aug 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Jul 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Jun 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">May 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Apr 01, 2025</span><span class="charge-amount">$89.99</span></div><div class="charge-item"><span class="charge-date">Mar 01, 2025</span><span class="charge-amount">$89.99</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="10" data-amount="39.76" data-next-date="2026-03-13">
+            <div class="top-row">
+                <div class="merchant">PHARMACY VANCOUVER</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(10)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$39.76</span> avg</div>
+                <div class="detail">6 charges</div>
+                <div class="detail">Every 59 days</div>
+                <div class="detail next ok">Next: Mar 13, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=PHARMACY+VANCOUVER+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=PHARMACY+VANCOUVER+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(10)">
+                <span class="triangle" id="triangle-10"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-10">
+                <div class="charge-item"><span class="charge-date">Nov 15, 2025</span><span class="charge-amount">$44.23</span></div><div class="charge-item"><span class="charge-date">Sep 15, 2025</span><span class="charge-amount">$51.67</span></div><div class="charge-item"><span class="charge-date">Jul 15, 2025</span><span class="charge-amount">$36.89</span></div><div class="charge-item"><span class="charge-date">May 15, 2025</span><span class="charge-amount">$42.18</span></div><div class="charge-item"><span class="charge-date">Mar 15, 2025</span><span class="charge-amount">$28.92</span></div><div class="charge-item"><span class="charge-date">Jan 22, 2025</span><span class="charge-amount">$34.67</span></div>
+            </div>
+        </div>
+        <div class="item" data-id="11" data-amount="153.58" data-next-date="2026-02-14">
+            <div class="top-row">
+                <div class="merchant">HARDWARE STORE BURNABY</div>
+                <input type="checkbox" class="checkbox" onchange="toggleDone(11)">
+            </div>
+            <div class="details">
+                <div class="detail"><span class="amount">$153.58</span> avg</div>
+                <div class="detail">6 charges</div>
+                <div class="detail">Every 61 days</div>
+                <div class="detail next soon">Next: Feb 14, 2026</div>
+            </div>
+            <div class="buttons">
+                <a href="https://www.google.com/search?q=HARDWARE+STORE+BURNABY+billing+payment+method" target="_blank" class="btn-primary">Update Payment Method →</a>
+                <a href="https://www.google.com/search?q=HARDWARE+STORE+BURNABY+update+payment+method" target="_blank" class="btn-secondary">Search Google</a>
+            </div>
+            <button class="toggle-charges" onclick="toggleCharges(11)">
+                <span class="triangle" id="triangle-11"></span>
+                <span>Show charges</span>
+            </button>
+            <div class="charges-list" id="charges-11">
+                <div class="charge-item"><span class="charge-date">Dec 15, 2025</span><span class="charge-amount">$256.78</span></div><div class="charge-item"><span class="charge-date">Oct 15, 2025</span><span class="charge-amount">$94.56</span></div><div class="charge-item"><span class="charge-date">Aug 15, 2025</span><span class="charge-amount">$167.89</span></div><div class="charge-item"><span class="charge-date">Jun 15, 2025</span><span class="charge-amount">$89.23</span></div><div class="charge-item"><span class="charge-date">Apr 22, 2025</span><span class="charge-amount">$234.56</span></div><div class="charge-item"><span class="charge-date">Feb 12, 2025</span><span class="charge-amount">$78.45</span></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const total = document.querySelectorAll('.item').length;
+        document.getElementById('total-count').textContent = total;
+        
+        // Load saved progress from browser localStorage
+        const saved = JSON.parse(localStorage.getItem('completed') || '{}');
+        Object.keys(saved).forEach(id => {
+            if (saved[id]) {
+                const item = document.querySelector(`[data-id="${id}"]`);
+                const checkbox = item.querySelector('.checkbox');
+                item.classList.add('done');
+                checkbox.checked = true;
+            }
+        });
+        sortItems();
+        updateProgress();
+        updateFilterCount();
+        
+        function toggleDone(id) {
+            const item = document.querySelector(`[data-id="${id}"]`);
+            const checkbox = item.querySelector('.checkbox');
+            item.classList.toggle('done');
+            
+            // Save progress
+            const completed = JSON.parse(localStorage.getItem('completed') || '{}');
+            completed[id] = checkbox.checked;
+            localStorage.setItem('completed', JSON.stringify(completed));
+            
+            sortItems();
+            updateProgress();
+        }
+        
+        function toggleCharges(id) {
+            const chargesList = document.getElementById('charges-' + id);
+            const triangle = document.getElementById('triangle-' + id);
+            chargesList.classList.toggle('open');
+            triangle.classList.toggle('open');
+        }
+        
+        function filterItems() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const items = document.querySelectorAll('.item');
+            
+            items.forEach(item => {
+                const merchant = item.querySelector('.merchant').textContent.toLowerCase();
+                if (merchant.includes(query)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            updateFilterCount();
+        }
+        
+        function updateFilterCount() {
+            const query = document.getElementById('search').value;
+            const items = document.querySelectorAll('.item');
+            const visible = Array.from(items).filter(item => item.style.display !== 'none').length;
+            const countEl = document.getElementById('filter-count');
+            
+            if (query) {
+                countEl.textContent = `Showing ${visible} of ${total} subscriptions`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+        
+        function sortItems() {
+            const list = document.getElementById('list');
+            const items = Array.from(list.querySelectorAll('.item'));
+            const sortBy = document.getElementById('sort-select').value;
+            
+            items.sort((a, b) => {
+                const aDone = a.classList.contains('done');
+                const bDone = b.classList.contains('done');
+                
+                // Primary sort by selected option
+                if (sortBy === 'status') {
+                    if (aDone === bDone) return 0;
+                    return aDone ? 1 : -1;
+                } else if (sortBy === 'amount-high') {
+                    const aAmount = parseFloat(a.dataset.amount);
+                    const bAmount = parseFloat(b.dataset.amount);
+                    return bAmount - aAmount;
+                } else if (sortBy === 'amount-low') {
+                    const aAmount = parseFloat(a.dataset.amount);
+                    const bAmount = parseFloat(b.dataset.amount);
+                    return aAmount - bAmount;
+                } else if (sortBy === 'date-soon') {
+                    const aDate = new Date(a.dataset.nextDate);
+                    const bDate = new Date(b.dataset.nextDate);
+                    return aDate - bDate;
+                } else if (sortBy === 'date-later') {
+                    const aDate = new Date(a.dataset.nextDate);
+                    const bDate = new Date(b.dataset.nextDate);
+                    return bDate - aDate;
+                }
+                return 0;
+            });
+            
+            // Re-append in sorted order
+            items.forEach(item => list.appendChild(item));
+        }
+        
+        function updateProgress() {
+            const done = document.querySelectorAll('.item.done').length;
+            document.getElementById('done-count').textContent = done;
+            document.getElementById('progress-fill').style.width = (done / total * 100) + '%';
+        }
+    </script>
+</body>
+</html>

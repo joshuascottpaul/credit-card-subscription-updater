@@ -1,0 +1,14 @@
+# Ignore personal transaction files
+download-transactions.csv
+recurring-subscriptions.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# OS
+.DS_Store
+Thumbs.db
