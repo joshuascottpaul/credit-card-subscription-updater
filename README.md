@@ -2,6 +2,8 @@
 
 When your credit card expires or gets replaced, updating payment information across dozens of recurring subscriptions is tedious. This tool analyzes your credit card transaction history to identify all recurring charges and generates an interactive checklist to track your progress.
 
+![Screenshot of subscription tracker](screenshot.png)
+
 ## Features
 
 - **Automatic Detection**: Identifies recurring subscriptions (3+ charges) from transaction CSV
